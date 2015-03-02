@@ -1,0 +1,6 @@
+# Prelude Term Mappings
+("Identity", "Identity")
+("runIdentity", "runIdentity")
+("myeq", "=")
+("myrev", "REVERSE")
+("myapp", "APPEND")

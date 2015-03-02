@@ -1,0 +1,4 @@
+# Prelude Term Mappings
+("Identity", "Identity")
+("[]", "list")
+("Bool", "bool")
