@@ -6,6 +6,8 @@ HaskHOL libraries for Haskell reasoning, including a verification plugin.
 The plugin provided in the HaskHOL.Haskell.Plugin module is an implementation of the verification workflow I've been working on as part of my dissertation work.
 Essentially, the plugin links HaskHOL into GHC at the intermediate language level, such that it can translate bindings to HOL terms and use the results to construct and prove proof obligations.
 
+More information about the plugin can be found in our [draft submission for ICFP'15](http://ecaustin.github.io/haskhol/papers/proof_plugin.pdf).
+
 ## Installation
 In order to compile the HaskHOL-Haskell package and use this plugin, the following dependencies must be installed from GitHub:
 
