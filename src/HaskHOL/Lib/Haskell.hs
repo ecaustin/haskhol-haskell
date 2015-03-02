@@ -33,11 +33,8 @@ defMONAD = getDefinition "MONAD"
 defRunIdentity :: (BasicConvs thry, HaskellCtxt thry) => HOL cls thry HOLThm
 defRunIdentity = getRecursiveDefinition "runIdentity"
 
-defRunIdentity2 :: HaskellCtxt thry => HOL cls thry HOLThm
-defRunIdentity2 = getAxiom "defRunIdentity2"
-
 thmIdentityMonad :: (BasicConvs thry, HaskellCtxt thry) => HOL cls thry HOLThm
-thmIdentityMonad = cacheProof "thmIdentityMonad" ctxtHaskell
+thmIdentityMonad = cacheProof "thmIdentityMonad" ctxtHaskell .
     prove [str| MONAD (\\ 'A 'B. \ m k. k (RunIdentity m)) Identity |] $
       tacREWRITE [defMONAD] `_THEN` tacCONJ `_THENL`
       [ _REPEAT tacGEN_TY `_THEN` tacREWRITE [defIdentity, defRunIdentity]

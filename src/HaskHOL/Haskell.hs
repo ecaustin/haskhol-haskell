@@ -13,7 +13,7 @@ module HaskHOL.Haskell
     , ctxtHaskell
     , haskell
     , module HaskHOL.Lib.Haskell
-    )
+    ) where
 
 import HaskHOL.Lib.Haskell hiding (HaskellType, HaskellCtxt)
-import HaskHOL.Lib.Context
+import HaskHOL.Lib.Haskell.Context
