@@ -1,5 +1,5 @@
 {-# LANGUAGE ExplicitForAll #-}
-module Monad where
+module MonadID where
 
 import Prelude hiding (Monad, return, (>>=))
 

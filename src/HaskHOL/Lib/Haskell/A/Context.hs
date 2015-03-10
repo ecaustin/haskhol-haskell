@@ -11,20 +11,23 @@
 -}
 module HaskHOL.Lib.Haskell.A.Context
     ( HaskellAType
+    , HaskellAThry
     , HaskellACtxt
     , ctxtHaskellA
     , haskellA
     ) where
 
 import HaskHOL.Core
-import HaskHOL.Deductive
 import HaskHOL.Math
 
 import HaskHOL.Lib.Haskell.A.Base
 
-extendTheory ctxtMath "HaskellA" $
-    do void tyDefIdentity'
-       void defIdentity'
+templateTypes ctxtMath "HaskellA"
+
+ctxtHaskellA :: TheoryPath HaskellAType
+ctxtHaskellA = extendTheory ctxtMath $(thisModule') $
+    do sequence_ [tyDefIdentity', tyDefMaybe']
+       sequence_ [defIdentity', defJust']
 
 templateProvers 'ctxtHaskellA
 
@@ -33,6 +36,3 @@ type family HaskellACtxt a where
     HaskellACtxt a = (MathCtxt a, HaskellAContext a ~ True)
 
 type instance PolyTheory HaskellAType b = HaskellACtxt b
-
-instance BasicConvs HaskellAType where
-    basicConvs _ = basicConvs (undefined :: MathType)

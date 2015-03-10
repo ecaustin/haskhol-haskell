@@ -1,5 +1,5 @@
 name:          haskhol-haskell
-version:       0.0.1
+version:       0.1.0
 synopsis:      A HERMIT plugin for verifying Haskell using HaskHOL.
 description:   More details can be found at the following page:  
                http://haskhol.org. 
@@ -17,12 +17,13 @@ extra-source-files: examples/Monad.hs, examples/types.h2h, examples/terms.h2h
 
 library
     default-language:  Haskell2010
-    default-extensions:  ConstraintKinds, OverloadedStrings, PatternSynonyms, 
-                         QuasiQuotes, TemplateHaskell
+    default-extensions:  ConstraintKinds, DeriveDataTypeable, OverloadedStrings,
+                         PatternSynonyms, QuasiQuotes, TemplateHaskell,
+                         TypeFamilies
     build-depends:   base >=4.7 && < 4.8
-                   , haskhol-core >=1.1
-                   , haskhol-deductive >=0.1
-                   , haskhol-math >=0.0.1
+                   , haskhol-core >=1.2
+                   , haskhol-deductive >=0.2
+                   , haskhol-math >=0.1
                    , hermit >= 0.6
                    , ghc >= 7.8
                    , containers >= 0.5
@@ -35,6 +36,8 @@ library
       HaskHOL.Haskell
       HaskHOL.Haskell.Plugin
       HaskHOL.Lib.Haskell
+      HaskHOL.Lib.Haskell.A.Context
+      HaskHOL.Lib.Haskell.Context
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -44,10 +47,8 @@ library
       HaskHOL.Haskell.Plugin.Transform
       HaskHOL.Lib.Haskell.A
       HaskHOL.Lib.Haskell.A.Base
-      HaskHOL.Lib.Haskell.A.Context
       HaskHOL.Lib.Haskell.Base
-      HaskHOL.Lib.Haskell.Context
           
     ghc-prof-options: -prof -fprof-auto
-    ghc-options: -Wall
+    ghc-options: -Wall -fcontext-stack=200
  

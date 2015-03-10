@@ -17,7 +17,11 @@ import HaskHOL.Core hiding (put, get)
 import qualified HaskHOL.Core as HC
 
 import Control.Monad.State
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
+
+import System.IO.Unsafe
+import Debug.Trace
+import HaskHOL.Haskell
 
 data HOLSum = Tm HOLTerm | Ty HOLType | TyOp TypeOp
 
@@ -123,6 +127,13 @@ transAlt = altT transAlt' (const transVar) transExpr
 -- The State monad should be at the top level to be correct.
 -- Maybe ask drew if the context is extendable with user data, would make it eaasier.
 -- Or just change the translation to use a custom context and write a wrapper in the plugin?
+
+instance Show HOLTerm where
+    show x = unsafePerformIO $ runHOLProof (showHOL x) ctxtHaskell
+
+instance Show HOLType where
+    show x = unsafePerformIO $ runHOLProof (showHOL x) ctxtHaskell
+
 transCase :: HOLSum -> HOLSum -> HOLSum -> [(Text, [HOLTerm], HOLTerm)] 
           -> HOLSum
 transCase (Tm match) (Tm asVar) (Ty resTy) alts = flip evalState 0 $
@@ -131,7 +142,8 @@ transCase (Tm match) (Tm asVar) (Ty resTy) alts = flip evalState 0 $
            tmSeq = mkVar "_SEQPATTERN" $ mkFunTy' [ty', ty', ty']
            clauses = foldr1 (\ s t -> mkComb' (mkComb' tmSeq s) t) alts'
            tmMatch = mkVar "_MATCH" $ mkFunTy' [asTy, ty', resTy]
-       return . Tm $! mkComb' (mkComb' tmMatch match) clauses
+           res = mkComb' (mkComb' tmMatch match) clauses
+       return $! Tm res
   where asTy = typeOf asVar
 
         mkPat :: (Text, [HOLTerm], HOLTerm) -> State Int HOLTerm
@@ -141,9 +153,10 @@ transCase (Tm match) (Tm asVar) (Ty resTy) alts = flip evalState 0 $
                let patTm = mkVar "_UNGUARDED_PATTERN" $ 
                              mkFunTy' [tyBool, tyBool, tyBool]
                    tys = map typeOf bvs
-                   conTm = mkVar con $ mkFunTy' (tys ++ [asTy])
+                   conTm = foldr (flip mkComb') 
+                             (mkVar con $ mkFunTy' (tys ++ [asTy])) bvs
                    bod = mkComb' (mkComb' patTm (mkGeq' conTm x)) (mkGeq' res y)
-               return $! mkAbs' x (mkAbs' y $ foldr (mkBinder' "?") bod bvs)
+               return $! mkAbs' x (mkAbs' y (foldr (mkBinder' "?") bod bvs))
 
         pgenVar :: HOLType -> State Int HOLTerm
         pgenVar ty =

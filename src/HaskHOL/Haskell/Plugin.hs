@@ -29,10 +29,11 @@ import HaskHOL.Lib.Haskell.Context
 
 import HERMIT.Dictionary.Navigation
 
+import Debug.Trace
+
 plugin :: Plugin
 plugin = hermitPlugin $ \ opts -> firstPass $
     do liftIO $ putStrLn "Parsing constant mappings..."
-       liftIO $ print opts
        let ctxt = ctxtHaskell
            liftHOL = liftHOL' ctxt
        tyMap <- prepConsts "types.h2h" $ liftHOL types
@@ -55,33 +56,38 @@ plugin = hermitPlugin $ \ opts -> firstPass $
 --
        liftIO $ putStrLn "Translating Bind..."
        bnd' <- trans' True bnd
+       liftHOL $ printHOL (bnd', typeOf bnd')
 --
        liftIO $ putStrLn "Translating Return..."
        ret' <- trans' False ret
+       liftHOL $ printHOL ret'
 --
        liftIO $ putStrLn "Building Monad Instance..."
-       monad <- liftHOL $ mkConstFull "MONAD" ([],[],[])
+       monad <- liftHOL $ mkConstFull "Monad" ([],[],[])
+       let tm' = fromJust $ liftM1 mkIComb (mkIComb monad bnd') ret'
+       liftHOL $ printHOL (tm', typeOf tm')
        let tm' = fromJust $ 
                    liftM1 mkIComb (mkIComb monad bnd') ret'
 --
        liftIO $ putStrLn "Proving..."
        liftHOL $ printHOL =<< 
          prove tm' 
-           (proveConsClass defMONAD inductionIdentity 
+           (proveConsClass defMonad inductionIdentity 
             [defIdentity, defRunIdentity])
 
 lookupBind :: String -> TransformH CoreTC LocalPathH
 lookupBind = bindingOfT . cmpString2Var
 
-prepConsts :: String -> HPM (Map Text b) -> HPM (Map Text b)
+prepConsts :: String -> HPM (Map Text b) -> HPM [(Text, b)]
 prepConsts file mcnsts =
     do cmap <- liftIO $ parse file
        cnsts <- mcnsts
-       return . mapFromList . catMaybes $ 
-         map (\ (x, y) -> do y' <- mapLookup y cnsts
-                             return (x, y')) cmap
+       let cnsts' = catMaybes $ 
+                      map (\ (x, y) -> do y' <- mapLookup y cnsts
+                                          return (x, y')) cmap
+       return (cnsts' ++ mapToList cnsts)
 
-replaceTerm :: Map Text HOLTerm -> TransHOL thry HOLTerm HOLTerm
+replaceTerm :: [(Text, HOLTerm)] -> TransHOL thry HOLTerm HOLTerm
 replaceTerm tmmap = repTerm
   where repTerm :: TransHOL thry HOLTerm HOLTerm
         repTerm =
@@ -96,13 +102,13 @@ replaceTerm tmmap = repTerm
 
         repVar :: Text -> HOLType -> HOL Proof thry HOLTerm
         repVar i ty =
-            do cs <- constants
-               case mapLookup i $ cs `mapUnion` tmmap of
-                 Just (Const i' _) ->
-                     mkMConst i' ty <?> "type mismatch for term constant."
-                 _ -> return $! mkVar i ty
+            (tryFind (\ (key, Const name ty') ->
+                      if key == i && isJust (typeMatch ty ty' ([], [], []))
+                      then mkMConst name ty
+                      else fail "") tmmap) 
+              <|> (return $! mkVar i ty)
 
-replaceType :: Map Text TypeOp -> TransHOL thry HOLTerm HOLTerm
+replaceType :: [(Text, TypeOp)] -> TransHOL thry HOLTerm HOLTerm
 replaceType tymap = repTerm
   where repTerm :: TransHOL thry HOLTerm HOLTerm
         repTerm =
@@ -116,21 +122,33 @@ replaceType tymap = repTerm
         repType :: TransHOL thry HOLType HOLType
         repType =
                contextfreeT (\ ty@TyVar{} -> return ty)
-            <+ htyappT repTyCon repType (\ x -> liftO . tyApp x)
+            <+ htyappT (contextfreeT return) repType repTyApp
             <+ hutypeT (contextfreeT return) repType 
                  (\ x -> liftO . mkUType x)
   
-        repTyCon :: TransHOL thry TypeOp TypeOp
-        repTyCon = contextfreeT $ \ e ->
-            case e of
-              TyPrimitive i arity
-                  | i == "fun" -> return e
-                  | otherwise ->
-                    case mapLookup i tymap of
-                      Nothing -> return $! mkTypeOpVar i
-                      Just op -> 
-                          let (_, arity') = destTypeOp op in
-                            if arity == arity' then return op
-                            else fail "arity mismatch for type operators."
-              _ -> return e
+        repTyApp :: TypeOp -> [HOLType] -> HOL Proof thry HOLType
+        repTyApp op tys = 
+            do op' <- repOp
+               liftO $! tyApp op' tys
+           where repOp :: HOL Proof thry TypeOp
+                 repOp =
+                     case op of
+                       (TyPrimitive i arity)
+                           | i == "fun" -> return op
+                           | otherwise ->
+                               (tryFind (\ (key, op') ->
+                                         let (_, arity') = destTypeOp op' in
+                                           if key == i && arity' == arity
+                                           then return op'
+                                           else fail "") tymap)
+                                 <|> (return $! mkTypeOpVar i)
+                       _ -> return op
                    
+-- crude generalization for constructors
+mkGenComb :: HOLTerm -> HOLTerm -> HOL cls thry HOLTerm
+mkGenComb f arg = (liftO $ mkIComb f arg) <|>
+    let (bvs, _) = fromJust . destUTypes $ typeOf f in
+      do bvs' <- mapM genVar bvs
+         let arg' = fromRight $
+                      listMkTyAbs bvs =<< listMkAbs bvs' =<< listMkComb arg bvs'
+         liftO $ mkIComb f arg'

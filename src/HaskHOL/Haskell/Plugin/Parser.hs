@@ -13,8 +13,8 @@ import Control.Exception hiding (try)
 import Control.Monad
 import Control.Monad.Identity
 import Data.Maybe
-import Data.Text hiding (map)
-import qualified Data.Text.IO as T
+import Data.Text.Lazy hiding (map)
+import qualified Data.Text.Lazy.IO as T
 
 import Text.Parsec
 import Text.Parsec.Language

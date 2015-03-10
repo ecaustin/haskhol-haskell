@@ -10,13 +10,18 @@
 module HaskHOL.Lib.Haskell.A.Base where
 
 import HaskHOL.Core
-import HaskHOL.Deductive hiding (newDefinition)
 import HaskHOL.Math
 
-tyDefIdentity' :: (BasicConvs thry, MathCtxt thry) 
-            => HOL Theory thry (HOLThm, HOLThm)
-tyDefIdentity' = defineType [str| Identity = ID A |]
+tyDefIdentity' :: MathCtxt thry => HOL Theory thry (HOLThm, HOLThm)
+tyDefIdentity' = defineType [str| Identity = IdentityIn A |]
 
-defIdentity' :: (BasicConvs thry, MathCtxt thry) => HOL Theory thry HOLThm
+defIdentity' :: MathCtxt thry => HOL Theory thry HOLThm
 defIdentity' = newDefinition "Identity"
-    [str| Identity = \\ 'a. \ x:'a. ID x |]
+    [str| Identity = \\ 'a. \ x:'a. IdentityIn x |]
+
+tyDefMaybe' :: MathCtxt thry => HOL Theory thry (HOLThm, HOLThm)
+tyDefMaybe' = defineType [str| Maybe = Nothing | JustIn A |]
+
+defJust' :: MathCtxt thry => HOL Theory thry HOLThm
+defJust' = newDefinition "Just"
+    [str| Just = \\ 'a. \ x:'a. JustIn x |]
