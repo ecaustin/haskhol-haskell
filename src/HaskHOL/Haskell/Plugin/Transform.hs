@@ -19,10 +19,6 @@ import qualified HaskHOL.Core as HC
 import Control.Monad.State
 import qualified Data.Text.Lazy as T
 
-import System.IO.Unsafe
-import Debug.Trace
-import HaskHOL.Haskell
-
 data HOLSum = Tm HOLTerm | Ty HOLType | TyOp TypeOp
 
 dummy :: TransformH a HOLSum
@@ -61,6 +57,7 @@ transApp (Tm x@(HC.Var name (UType xty@(TyVar _ bname) ty))) y =
     case y of
       TyOp op -> Tm . mkVar name $ typeSubst [(mkTypeOpVar bname, op)] ty
       Ty ty' -> Tm . mkVar name $ typeSubst [(xty, ty')] ty
+      Ty ty' -> Tm $ mkTyComb' x ty'
       Tm y' -> Tm $ mkComb' x y'
 transApp (Tm x) (Ty y) = Tm $ mkTyComb' x y
 -- erase type class arguments rather crudely
@@ -127,12 +124,6 @@ transAlt = altT transAlt' (const transVar) transExpr
 -- The State monad should be at the top level to be correct.
 -- Maybe ask drew if the context is extendable with user data, would make it eaasier.
 -- Or just change the translation to use a custom context and write a wrapper in the plugin?
-
-instance Show HOLTerm where
-    show x = unsafePerformIO $ runHOLProof (showHOL x) ctxtHaskell
-
-instance Show HOLType where
-    show x = unsafePerformIO $ runHOLProof (showHOL x) ctxtHaskell
 
 transCase :: HOLSum -> HOLSum -> HOLSum -> [(Text, [HOLTerm], HOLTerm)] 
           -> HOLSum

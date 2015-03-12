@@ -20,9 +20,16 @@ module HaskHOL.Lib.Haskell
     , recursionMaybe
     , defIdentity
     , defJust
+    , defEQ
     , defMonad
+    , defFunctor
     , defRunIdentity
-    , thmIdentityMonad
+    , thmMonadIdentity
+    , thmMonadMaybe
+    , thmFunctorIdentity
+    , tacMonadIdentity
+    , tacMonadMaybe
+    , tacFunctorIdentity
     , proveConsClass
     ) where
 
@@ -37,12 +44,15 @@ import HaskHOL.Lib.Haskell.Context
 defMonad :: HaskellCtxt thry => HOL cls thry HOLThm
 defMonad = getDefinition "Monad"
 
+defFunctor :: HaskellCtxt thry => HOL cls thry HOLThm
+defFunctor = getDefinition "Functor"
+
 defRunIdentity :: HaskellCtxt thry => HOL cls thry HOLThm
 defRunIdentity = getRecursiveDefinition "runIdentity"
 
-thmIdentityMonad :: HaskellCtxt thry => HOL cls thry HOLThm
-thmIdentityMonad = cacheProof "thmIdentityMonad" ctxtHaskell .
-    prove [str| Monad (\\ 'A 'B. \ m k. k (RunIdentity m)) Identity |] $
+thmMonadIdentity :: HaskellCtxt thry => HOL cls thry HOLThm
+thmMonadIdentity = cacheProof "thmMonadIdentity" ctxtHaskell .
+    prove [str| Monad (\\ 'A 'B. \ m k. k (runIdentity m)) Identity |] $
       tacREWRITE [defMonad] `_THEN` tacCONJ `_THENL`
       [ _REPEAT tacGEN_TY `_THEN` tacREWRITE [defIdentity, defRunIdentity]
       , tacCONJ `_THENL`
@@ -52,19 +62,43 @@ thmIdentityMonad = cacheProof "thmIdentityMonad" ctxtHaskell .
         ]
       ]
 
+thmMonadMaybe :: HaskellCtxt thry => HOL cls thry HOLThm
+thmMonadMaybe = cacheProof "thmMonadMaybe" ctxtHaskell $
+    prove [str| Monad 
+                  (\\'a 'b. (\ ds k .
+                     match ds with Nothing -> Nothing | JustIn x -> k x)) 
+                  Just |] tacMonadMaybe
+
+thmFunctorIdentity :: HaskellCtxt thry => HOL cls thry HOLThm
+thmFunctorIdentity = cacheProof "thmFunctorIdentity" ctxtHaskell $
+    prove [str| Functor (\\ 'a 'b. \ (f:'a -> 'b) id. 
+                            Identity [: 'b] (f (runIdentity id))) |]
+      tacFunctorIdentity
+           
+
 proveConsClass :: (HOLThmRep thm cls thry, MathCtxt thry) 
                => thm -> thm -> [thm] -> Tactic cls thry
 proveConsClass consDef indThm thms =
     tacREWRITE [consDef] `_THEN` 
     _REPEAT (_TRY (tacCONJ `_THEN` _REPEAT tacGEN_TY) `_THEN` 
-             _TRY (tacMATCH_MP indThm) `_THEN` 
+             _TRY (tacMATCH_MP indThm `_ORELSE` 
+                   (tacABS_TO_ALL `_THEN` tacMATCH_MP indThm) `_ORELSE`
+                   _REPEAT tacGEN) `_THEN` 
              tacREWRITE thms)
+  where tacABS_TO_ALL :: BoolCtxt thry => Tactic cls thry
+        tacABS_TO_ALL =
+            tacABS `_THEN` 
+            (\ gl@(Goal _ w) -> let a = head $ frees w in 
+                                  tacSPEC (a, a) gl)
 
-{-
-[str| Monad (\\'a 'b. (\ ds k . match ds with Nothing -> Nothing | JustIn x -> k x)) Just |]
+tacMonadIdentity :: HaskellCtxt thry => Tactic cls thry
+tacMonadIdentity = 
+    proveConsClass defMonad inductionIdentity [defIdentity, defRunIdentity]
 
-tacREWRITE [defMonad]
-(tacCONJ `_THEN` _REPEAT tacGEN_TY)
-induction failed `orelse` _REPEAT tacGEN `_THEN`
-ty_beta redex goes here
--}
+tacMonadMaybe :: HaskellCtxt thry => Tactic cls thry
+tacMonadMaybe = proveConsClass defMonad inductionMaybe [defJust]
+
+tacFunctorIdentity :: HaskellCtxt thry => Tactic cls thry
+tacFunctorIdentity =
+    proveConsClass defFunctor inductionIdentity 
+      [defIdentity, defRunIdentity, defI, defO]

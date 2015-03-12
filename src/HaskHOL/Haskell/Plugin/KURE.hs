@@ -19,7 +19,7 @@ import Control.Monad.IO.Class
 type TransHOL thry a b = Transform (TheoryPath thry) IO a b
 
 liftHOL' :: MonadIO m => TheoryPath thry -> HOL Proof thry a -> m a
-liftHOL' ctxt x = liftIO $ runHOLProof x ctxt
+liftHOL' ctxt x = liftIO $ runHOLProof True x ctxt
 
 htyvarT :: TransHOL thry Bool a -> TransHOL thry Text b
         -> (a -> b -> HOL Proof thry c) -> TransHOL thry HOLType c

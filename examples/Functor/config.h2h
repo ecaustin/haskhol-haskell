@@ -1,0 +1,6 @@
+binding: $fFunctorIdentity
+bindingType: ConsClass
+class: Functor
+proofType: Tactic
+proofModule: HaskHOL.Lib.Haskell
+proofName: tacFunctorIdentity

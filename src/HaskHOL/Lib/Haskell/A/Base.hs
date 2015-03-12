@@ -25,3 +25,7 @@ tyDefMaybe' = defineType [str| Maybe = Nothing | JustIn A |]
 defJust' :: MathCtxt thry => HOL Theory thry HOLThm
 defJust' = newDefinition "Just"
     [str| Just = \\ 'a. \ x:'a. JustIn x |]
+
+defEQ' :: MathCtxt thry => HOL Theory thry HOLThm
+defEQ' = newDefinition "EQ"
+    [str| EQ = \\ 'a. \ x:'a y. x = y |]

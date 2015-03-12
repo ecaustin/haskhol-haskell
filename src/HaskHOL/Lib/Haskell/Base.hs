@@ -41,17 +41,27 @@ defMonad' = newDefinition "Monad"
     [str| Monad (bind : % 'A 'B. 'A _M -> ('A -> 'B _M) -> 'B _M)
                 (return : % 'A. 'A -> 'A _M)
           = ((!! 'A 'B. ! (a: 'A) (f:'A -> 'B _M). 
-                 bind [: 'A] [: 'B] (return [: 'A] a) f = f a) /\
+                 bind (return a) f = f a) /\
              (!! 'A. ! (m: 'A _M). 
                  bind m return = m) /\
              (!! 'A 'B 'C. ! (m: 'A _M) (f: 'A -> 'B _M) (g: 'B -> 'C _M).
                  bind (bind m f) g = bind m (\ x. bind (f x) g))) |]
+
+defFunctor' :: HaskellACtxt thry => HOL Theory thry HOLThm
+defFunctor' = newDefinition "Functor"
+    [str| Functor (fmap : % 'A 'B. ('A -> 'B) -> 'A _F -> 'B _F)
+          = ((!! 'A. fmap (I:'A -> 'A) = I) /\
+             (!! 'A 'B 'C. ! (f:'B -> 'C) (g:'A -> 'B).
+                 fmap (f o g) = fmap f o fmap g)) |]
 
 defIdentity :: HaskellACtxt thry => HOL cls thry HOLThm
 defIdentity = getDefinition "Identity"
 
 defJust :: HaskellACtxt thry => HOL cls thry HOLThm
 defJust = getDefinition "Just"
+
+defEQ :: HaskellACtxt thry => HOL cls thry HOLThm
+defEQ = getDefinition "EQ"
 
 defRunIdentity' :: HaskellACtxt thry => HOL Theory thry HOLThm
 defRunIdentity' = newRecursiveDefinition "runIdentity" recursionIdentity

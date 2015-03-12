@@ -1,0 +1,5 @@
+binding: prop
+bindingType: Test
+proofType: HOLThm
+proofModule: HaskHOL.Lib.Lists
+proofName: thmREVERSE_APPEND2

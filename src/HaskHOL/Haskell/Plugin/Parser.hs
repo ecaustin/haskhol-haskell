@@ -21,14 +21,17 @@ import Text.Parsec.Language
 import qualified Text.Parsec.Token as P
 
 -- Config File Parsing
+parseFromFile :: SourceName -> Parsec Text () a -> IO (Either ParseError a) 
+parseFromFile f p = liftM (runParser p () f) $ T.readFile f
+
 language :: GenLanguageDef Text () Identity
 language = P.LanguageDef 
     { P.commentStart = ""
     , P.commentEnd = ""
     , P.commentLine = ""
     , P.nestedComments = True
-    , P.identStart = letter <|> char '_'
-    , P.identLetter = alphaNum <|> oneOf "_'#"
+    , P.identStart = letter <|> oneOf "_$"
+    , P.identLetter = alphaNum <|> oneOf "_'#$"
     , P.opStart = oneOf ":!#$%&*+./<=>?@\\^|-~"
     , P.opLetter = oneOf ":!#$%&*+./<=>?@\\^|-~"
     , P.reservedOpNames = []
@@ -69,45 +72,31 @@ parser = sepBy1 (pComment <|> pPair) whiteSpace
 
 parse :: SourceName -> IO [(Text, Text)]
 parse f =
-    do pairs <- parseFromFile parser
+    do pairs <- parseFromFile f parser
        case pairs of
          Left err -> throwIO . userError $ show err
          Right res -> return $! catMaybes res
-  where parseFromFile :: Parsec Text () a -> IO (Either ParseError a) 
-        parseFromFile p = liftM (runParser p () f) $ T.readFile f
        
 
 -- Option Parsing
-language' :: LanguageDef ()
-language' = emptyDef
+pId :: Parsec Text () String
+pId = P.identifier lexer
 
-lexer' :: P.TokenParser ()
-lexer' = P.makeTokenParser language'
-
-identifier :: Parsec String () String
-identifier = P.identifier lexer'
-
-dot :: Parsec String () String
-dot = P.dot lexer'
-
-pId :: Parsec String () String
-pId = 
-    do ids <- identifier `sepBy1` dot
-       case ids of
-         [x] -> return x
-         [x, y] -> return $! x ++ "." ++ y
-         _ -> fail "optParse: bad key value pair."
-
-pEq :: Parsec String () (String, String)
-pEq =
+pOpt :: Parsec Text () (String, String)
+pOpt =
     do key <- pId
-       void $ char '='
-       val <- pId <?> "configuration setting"
+       whiteSpace
+       void $ char ':'
+       whiteSpace
+       val <- manyTill anyChar newline <?> "configuration setting"
        return (key, val)
 
-optParse :: [String] -> IO (Maybe String, Maybe String, Maybe String)
-optParse opts =
-    case mapM (runParser pEq () undefined) opts of
-      Left err -> throwIO . userError $ show err
-      Right opts' -> return
-        (lookup "ctxt" opts', lookup "types" opts', lookup "terms" opts')
+optParser :: Parsec Text () [(String, String)]
+optParser = sepBy1 pOpt whiteSpace
+
+optParse :: SourceName -> IO [(String, String)]
+optParse f =
+    do opts <- parseFromFile f optParser
+       case opts of
+         Left err -> throwIO . userError $ show err
+         Right res -> return res

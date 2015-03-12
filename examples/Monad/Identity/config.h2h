@@ -1,0 +1,6 @@
+binding: $fMonadIdentity
+bindingType: ConsClass
+class: Monad
+proofType: Tactic
+proofModule: HaskHOL.Lib.Haskell
+proofName: tacMonadIdentity

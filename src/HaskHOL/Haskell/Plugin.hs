@@ -14,6 +14,7 @@ module HaskHOL.Haskell.Plugin
 import Control.Monad.State
 
 import HERMIT.Context (LocalPathH)
+import HERMIT.Dictionary.Navigation
 import HERMIT.GHC (Plugin, cmpString2Var)
 import HERMIT.Kure
 import HERMIT.Plugin hiding (pass)
@@ -24,59 +25,76 @@ import HaskHOL.Haskell.Plugin.Transform
 
 import HaskHOL.Core
 import HaskHOL.Deductive
-import HaskHOL.Lib.Haskell
 import HaskHOL.Lib.Haskell.Context
 
-import HERMIT.Dictionary.Navigation
+ctxt :: TheoryPath HaskellType
+ctxt = ctxtHaskell
 
-import Debug.Trace
+liftHOL :: HOL Proof HaskellType a -> HPM a
+liftHOL = liftHOL' ctxt
 
 plugin :: Plugin
-plugin = hermitPlugin $ \ opts -> firstPass $
-    do liftIO $ putStrLn "Parsing constant mappings..."
-       let ctxt = ctxtHaskell
-           liftHOL = liftHOL' ctxt
+plugin = hermitPlugin $ \ _ -> firstPass $
+    do liftIO $ putStrLn "Parsing configuration files..."
        tyMap <- prepConsts "types.h2h" $ liftHOL types
        tmMap <- prepConsts "terms.h2h" $ liftHOL constants
+       opts <- liftIO $ optParse "config.h2h"
+       let getOpt :: String -> String -> HPM String
+           getOpt lbl err =
+             maybe (fail err) return $ lookup lbl opts
 --
        liftIO $ putStrLn "Translating from Core to HOL..."
-       tm <- at (lookupBind "$fMonadIdentity") $ query trans
-       let (_, [bnd, ret]) = stripComb tm
+       target <- getOpt "binding" "<binding> not set in config.h2h."
+       tm <- at (bindingOfT $ cmpString2Var target) $ query trans
 --
        let pass :: HOLTerm -> HPM HOLTerm
            pass x = liftIO $
                do x' <- applyT (replaceType tyMap) ctxt x
                   applyT (replaceTerm tmMap) ctxt x'
-           
-           trans' :: Bool -> HOLTerm -> HPM HOLTerm
-           trans' True (Var name _) =
-               pass =<< (at (lookupBind $ unpack name) $ 
-                            query trans)
-           trans' _ x = pass x
---
-       liftIO $ putStrLn "Translating Bind..."
-       bnd' <- trans' True bnd
-       liftHOL $ printHOL (bnd', typeOf bnd')
---
-       liftIO $ putStrLn "Translating Return..."
-       ret' <- trans' False ret
-       liftHOL $ printHOL ret'
---
-       liftIO $ putStrLn "Building Monad Instance..."
-       monad <- liftHOL $ mkConstFull "Monad" ([],[],[])
-       let tm' = fromJust $ liftM1 mkIComb (mkIComb monad bnd') ret'
-       liftHOL $ printHOL (tm', typeOf tm')
-       let tm' = fromJust $ 
-                   liftM1 mkIComb (mkIComb monad bnd') ret'
+       cls <- getOpt "bindingType" "<bindingType> not set in config.h2h."
+       tm' <- if cls == "ConsClass" 
+              then do cls' <- getOpt "class" "<class> not set in config.h2h."
+                      consClassPass cls' tm pass
+              else let (bvs, bod) = stripTyAbs tm
+                       (bvs', bod') = stripAbs bod in
+                     do x <- pass bod'
+                        bvs'' <- mapM pass bvs'
+                        liftHOL $ flip (foldrM mkTyAll) bvs =<< 
+                          listMkForall bvs'' x
 --
        liftIO $ putStrLn "Proving..."
-       liftHOL $ printHOL =<< 
-         prove tm' 
-           (proveConsClass defMonad inductionIdentity 
-            [defIdentity, defRunIdentity])
+       prfType <- getOpt "proofType" "<proofType> not set in config.h2h."
+       prfMod <- getOpt "proofModule" "<proofModule> not set in config.h2h."
+       prfName <- getOpt "proofName" "<proofName> not set in config.h2h."
+       tac <- liftHOL $ if prfType == "HOLThm"
+                        then do thm <- runHOLHint prfName [prfMod]
+                                return (tacACCEPT (thm::HOLThm))
+                        else runHOLHint ("return " ++ prfName) 
+                               [prfMod, "HaskHOL.Deductive"]
+       liftHOL $ printHOL =<< prove tm' tac
 
-lookupBind :: String -> TransformH CoreTC LocalPathH
-lookupBind = bindingOfT . cmpString2Var
+consClassPass :: String -> HOLTerm -> (HOLTerm -> HPM HOLTerm) -> HPM HOLTerm
+consClassPass cls tm pass =
+    do liftIO $ putStrLn "Translating Arguments..."
+       let (_, args) = stripComb tm
+       args' <- mapM trans' args
+--
+       liftIO $ putStrLn "Building Class Instance..."
+       monad <- liftHOL $ mkConstFull (pack cls) ([],[],[])
+       maybe (fail "Reconstruction of class instance failed.") return $
+         foldlM mkIComb monad args'
+  where trans' :: HOLTerm -> HPM HOLTerm
+        trans' x@(Var name _) = pass =<< query
+            (do lp <- lookupBind $ unpack name
+                case lp of
+                  Nothing -> return x
+                  Just res -> localPathT res trans)
+        trans' x = pass x
+
+        lookupBind :: String -> TransformH CoreTC (Maybe LocalPathH)
+        lookupBind x = catchesT [ liftM Just . bindingOfT $ cmpString2Var x
+                                , return Nothing
+                                ]
 
 prepConsts :: String -> HPM (Map Text b) -> HPM [(Text, b)]
 prepConsts file mcnsts =
@@ -103,7 +121,7 @@ replaceTerm tmmap = repTerm
         repVar :: Text -> HOLType -> HOL Proof thry HOLTerm
         repVar i ty =
             (tryFind (\ (key, Const name ty') ->
-                      if key == i && isJust (typeMatch ty ty' ([], [], []))
+                      if key == i && isJust (typeMatch ty' ty ([], [], []))
                       then mkMConst name ty
                       else fail "") tmmap) 
               <|> (return $! mkVar i ty)
@@ -143,12 +161,3 @@ replaceType tymap = repTerm
                                            else fail "") tymap)
                                  <|> (return $! mkTypeOpVar i)
                        _ -> return op
-                   
--- crude generalization for constructors
-mkGenComb :: HOLTerm -> HOLTerm -> HOL cls thry HOLTerm
-mkGenComb f arg = (liftO $ mkIComb f arg) <|>
-    let (bvs, _) = fromJust . destUTypes $ typeOf f in
-      do bvs' <- mapM genVar bvs
-         let arg' = fromRight $
-                      listMkTyAbs bvs =<< listMkAbs bvs' =<< listMkComb arg bvs'
-         liftO $ mkIComb f arg'
