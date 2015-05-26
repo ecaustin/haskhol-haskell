@@ -25,7 +25,7 @@ dummy :: TransformH a HOLSum
 dummy = return . Tm $ mkVar "a" tyBool
 
 -- Top-level'ish transformations
-trans :: TransformH CoreTC HOLTerm
+trans :: TransformH LCoreTC HOLTerm
 trans = promoteBindT (transform $ \ c -> liftM snd . applyT transBind c)
 
 transBind :: TransformH CoreBind (HOLTerm, HOLTerm)
@@ -57,7 +57,6 @@ transApp (Tm x@(HC.Var name (UType xty@(TyVar _ bname) ty))) y =
     case y of
       TyOp op -> Tm . mkVar name $ typeSubst [(mkTypeOpVar bname, op)] ty
       Ty ty' -> Tm . mkVar name $ typeSubst [(xty, ty')] ty
-      Ty ty' -> Tm $ mkTyComb' x ty'
       Tm y' -> Tm $ mkComb' x y'
 transApp (Tm x) (Ty y) = Tm $ mkTyComb' x y
 -- erase type class arguments rather crudely

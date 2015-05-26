@@ -31,6 +31,13 @@ module HaskHOL.Lib.Haskell
     , tacMonadMaybe
     , tacFunctorIdentity
     , proveConsClass
+    -- Either
+    , tyDefEither
+    , inductionEither
+    , recursionEither
+    , defLeft
+    , defRight
+    , tacMonadEither
     ) where
 
 import HaskHOL.Core
@@ -102,3 +109,17 @@ tacFunctorIdentity :: HaskellCtxt thry => Tactic cls thry
 tacFunctorIdentity =
     proveConsClass defFunctor inductionIdentity 
       [defIdentity, defRunIdentity, defI, defO]
+
+
+-- Either
+tacMonadEither :: HaskellCtxt thry => Tactic cls thry
+tacMonadEither = proveConsClass defMonad inductionEither [defLeft, defRight]
+
+{-
+[str| !! 'A. Monad2 ((\\ 'e 'a 'b. (\ (ds:('e, 'a) Either) (k:'a -> ('e, 'b) Either). match ds with LeftIn l -> Left [: 'e] [: 'b] l | RightIn r -> k r)) [: 'A]) (\\ 'a. Right [: 'A] [: 'a]) |]
+
+[str| Monad2 (\\ 'a 'b. (\ (ds:('A, 'a) Either) (k:'a -> ('A, 'b) Either). match ds with LeftIn l -> Left [: 'A] [: 'b] l | RightIn r -> k r)) |]
+
+[str| Monad2 (\\ 'a 'b. \ ds k. (x:('e, 'a) Either)) (\\ 'a. Right [: 'e] [: 'a]) |]
+
+-}

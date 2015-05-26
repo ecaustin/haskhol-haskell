@@ -29,3 +29,16 @@ defJust' = newDefinition "Just"
 defEQ' :: MathCtxt thry => HOL Theory thry HOLThm
 defEQ' = newDefinition "EQ"
     [str| EQ = \\ 'a. \ x:'a y. x = y |]
+
+
+-- Either
+tyDefEither' :: MathCtxt thry => HOL Theory thry (HOLThm, HOLThm)
+tyDefEither' = defineType [str| Either = LeftIn A | RightIn B |]
+
+defLeft' :: MathCtxt thry => HOL Theory thry HOLThm
+defLeft' = newDefinition "Left"
+    [str| Left = \\ 'a 'b. \ x:'a. (LeftIn x):(('a, 'b) Either) |]
+
+defRight' :: MathCtxt thry => HOL Theory thry HOLThm
+defRight' = newDefinition "Right"
+    [str| Right = \\ 'a 'b. \ x:'b. (RightIn x):(('a, 'b) Either) |]

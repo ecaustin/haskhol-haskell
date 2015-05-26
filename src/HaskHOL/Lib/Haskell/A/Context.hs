@@ -26,8 +26,9 @@ templateTypes ctxtMath "HaskellA"
 
 ctxtHaskellA :: TheoryPath HaskellAType
 ctxtHaskellA = extendTheory ctxtMath $(thisModule') $
-    do sequence_ [tyDefIdentity', tyDefMaybe']
+    do sequence_ [tyDefIdentity', tyDefMaybe', tyDefEither']
        sequence_ [defEQ', defIdentity', defJust']
+       sequence_ [defLeft', defRight']
 
 templateProvers 'ctxtHaskellA
 

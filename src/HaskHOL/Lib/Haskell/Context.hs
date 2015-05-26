@@ -26,7 +26,7 @@ templateTypes ctxtHaskellA "Haskell"
 
 ctxtHaskell :: TheoryPath HaskellType
 ctxtHaskell = extendTheory ctxtHaskellA $(thisModule') $
-    sequence_ [defMonad', defFunctor', defRunIdentity']
+    sequence_ [defMonad', defMonad2', defFunctor', defRunIdentity']
 
 templateProvers 'ctxtHaskell
 

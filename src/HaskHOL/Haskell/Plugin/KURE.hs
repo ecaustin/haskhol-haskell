@@ -12,14 +12,15 @@ module HaskHOL.Haskell.Plugin.KURE where
 import HaskHOL.Core
 
 import HERMIT.Kure
+import HERMIT.Plugin.Types
 
-import Control.Monad.IO.Class
+import Control.Monad.Trans
 
 
-type TransHOL thry a b = Transform (TheoryPath thry) IO a b
+type TransHOL thry a b = Transform (TheoryPath thry) PluginM a b
 
-liftHOL' :: MonadIO m => TheoryPath thry -> HOL Proof thry a -> m a
-liftHOL' ctxt x = liftIO $ runHOLProof True x ctxt
+liftHOL' :: TheoryPath thry -> HOL Proof thry a -> PluginM a
+liftHOL' ctxt x = lift (runHOLProof True x ctxt)
 
 htyvarT :: TransHOL thry Bool a -> TransHOL thry Text b
         -> (a -> b -> HOL Proof thry c) -> TransHOL thry HOLType c

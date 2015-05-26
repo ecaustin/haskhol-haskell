@@ -1,6 +1,6 @@
 binding: $fMonadMaybe
 bindingType: ConsClass
 class: Monad
-proofType: HOLThm
+proofType: Tactic
 proofModule: HaskHOL.Lib.Haskell
-proofName: thmMonadMaybe
+proofName: tacMonadMaybe

@@ -47,6 +47,19 @@ defMonad' = newDefinition "Monad"
              (!! 'A 'B 'C. ! (m: 'A _M) (f: 'A -> 'B _M) (g: 'B -> 'C _M).
                  bind (bind m f) g = bind m (\ x. bind (f x) g))) |]
 
+defMonad2' :: HaskellACtxt thry => HOL Theory thry HOLThm
+defMonad2' = newDefinition "Monad2"
+    [str| Monad2 (bind : % 'A 'B . ('E, 'A) _M -> ('A -> ('E, 'B) _M) 
+                                -> ('E, 'B) _M)
+                 (return : % 'A. 'A -> ('E, 'A) _M)
+          = ((!! 'A 'B. ! (a: 'A) (f:'A -> ('E, 'B) _M). 
+                 bind (return a) f = f a) /\
+             (!! 'A. ! (m: ('E, 'A) _M). 
+                 bind m return = m) /\
+             (!! 'A 'B 'C. ! (m: ('E, 'A) _M) (f: 'A -> ('E, 'B) _M) 
+                             (g: 'B -> ('E, 'C) _M).
+                 bind (bind m f) g = bind m (\ x. bind (f x) g))) |]
+
 defFunctor' :: HaskellACtxt thry => HOL Theory thry HOLThm
 defFunctor' = newDefinition "Functor"
     [str| Functor (fmap : % 'A 'B. ('A -> 'B) -> 'A _F -> 'B _F)
@@ -66,3 +79,22 @@ defEQ = getDefinition "EQ"
 defRunIdentity' :: HaskellACtxt thry => HOL Theory thry HOLThm
 defRunIdentity' = newRecursiveDefinition "runIdentity" recursionIdentity
     [str| runIdentity (IdentityIn x) = x |]
+
+
+-- Either
+tyDefEither :: HaskellACtxt thry => HOL cls thry (HOLThm, HOLThm)
+tyDefEither = getType "Either"
+
+inductionEither :: HaskellACtxt thry => HOL cls thry HOLThm
+inductionEither = cacheProof "inductionEither" ctxtHaskellA $ 
+    liftM fst tyDefEither
+
+recursionEither :: HaskellACtxt thry => HOL cls thry HOLThm
+recursionEither = cacheProof "recursionEither" ctxtHaskellA $ 
+    liftM snd tyDefEither
+
+defLeft :: HaskellACtxt thry => HOL cls thry HOLThm
+defLeft = getDefinition "Left"
+
+defRight :: HaskellACtxt thry => HOL cls thry HOLThm
+defRight = getDefinition "Right"

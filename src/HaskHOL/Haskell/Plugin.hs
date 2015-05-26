@@ -16,8 +16,10 @@ import Control.Monad.State
 import HERMIT.Context (LocalPathH)
 import HERMIT.Dictionary.Navigation
 import HERMIT.GHC (Plugin, cmpString2Var)
+import HERMIT.Kernel
 import HERMIT.Kure
 import HERMIT.Plugin hiding (pass)
+import HERMIT.Plugin.Types
 
 import HaskHOL.Haskell.Plugin.KURE
 import HaskHOL.Haskell.Plugin.Parser
@@ -30,7 +32,7 @@ import HaskHOL.Lib.Haskell.Context
 ctxt :: TheoryPath HaskellType
 ctxt = ctxtHaskell
 
-liftHOL :: HOL Proof HaskellType a -> HPM a
+liftHOL :: HOL Proof HaskellType a -> PluginM a
 liftHOL = liftHOL' ctxt
 
 plugin :: Plugin
@@ -39,16 +41,17 @@ plugin = hermitPlugin $ \ _ -> firstPass $
        tyMap <- prepConsts "types.h2h" $ liftHOL types
        tmMap <- prepConsts "terms.h2h" $ liftHOL constants
        opts <- liftIO $ optParse "config.h2h"
-       let getOpt :: String -> String -> HPM String
+       let getOpt :: String -> String -> PluginM String
            getOpt lbl err =
              maybe (fail err) return $ lookup lbl opts
 --
        liftIO $ putStrLn "Translating from Core to HOL..."
        target <- getOpt "binding" "<binding> not set in config.h2h."
-       tm <- at (bindingOfT $ cmpString2Var target) $ query trans
+       tm <- query Never $ do path <- bindingOfT $ cmpString2Var target
+                              localPathT path trans
 --
-       let pass :: HOLTerm -> HPM HOLTerm
-           pass x = liftIO $
+       let pass :: HOLTerm -> PluginM HOLTerm
+           pass x =
                do x' <- applyT (replaceType tyMap) ctxt x
                   applyT (replaceTerm tmMap) ctxt x'
        cls <- getOpt "bindingType" "<bindingType> not set in config.h2h."
@@ -73,7 +76,8 @@ plugin = hermitPlugin $ \ _ -> firstPass $
                                [prfMod, "HaskHOL.Deductive"]
        liftHOL $ printHOL =<< prove tm' tac
 
-consClassPass :: String -> HOLTerm -> (HOLTerm -> HPM HOLTerm) -> HPM HOLTerm
+consClassPass :: String -> HOLTerm -> (HOLTerm -> PluginM HOLTerm)
+              -> PluginM HOLTerm
 consClassPass cls tm pass =
     do liftIO $ putStrLn "Translating Arguments..."
        let (_, args) = stripComb tm
@@ -83,20 +87,20 @@ consClassPass cls tm pass =
        monad <- liftHOL $ mkConstFull (pack cls) ([],[],[])
        maybe (fail "Reconstruction of class instance failed.") return $
          foldlM mkIComb monad args'
-  where trans' :: HOLTerm -> HPM HOLTerm
-        trans' x@(Var name _) = pass =<< query
+  where trans' :: HOLTerm -> PluginM HOLTerm
+        trans' x@(Var name _) = pass =<< query Never
             (do lp <- lookupBind $ unpack name
                 case lp of
                   Nothing -> return x
                   Just res -> localPathT res trans)
         trans' x = pass x
 
-        lookupBind :: String -> TransformH CoreTC (Maybe LocalPathH)
+        lookupBind :: String -> TransformH LCoreTC (Maybe LocalPathH)
         lookupBind x = catchesT [ liftM Just . bindingOfT $ cmpString2Var x
                                 , return Nothing
                                 ]
 
-prepConsts :: String -> HPM (Map Text b) -> HPM [(Text, b)]
+prepConsts :: String -> PluginM (Map Text b) -> PluginM [(Text, b)]
 prepConsts file mcnsts =
     do cmap <- liftIO $ parse file
        cnsts <- mcnsts
@@ -109,10 +113,12 @@ replaceTerm :: [(Text, HOLTerm)] -> TransHOL thry HOLTerm HOLTerm
 replaceTerm tmmap = repTerm
   where repTerm :: TransHOL thry HOLTerm HOLTerm
         repTerm =
-               contextfreeT (\ tm@Const{} -> return tm)
+               hconstT (contextfreeT return) (contextfreeT return)
+                       (\ x ty -> mkMConst x ty)
             <+ hcombT repTerm repTerm (\ x -> liftO . mkComb x)
             <+ habsT (contextfreeT return) repTerm (\ x -> liftO . mkAbs x)
-            <+ htycombT repTerm (contextfreeT return) (\ x -> liftO . mkTyComb x)
+            <+ htycombT repTerm (contextfreeT return) 
+                        (\ x -> liftO . mkTyComb x)
             <+ htyabsT (contextfreeT return) repTerm (\ x -> liftO . mkTyAbs x)
             <+ hvarT (contextfreeT return) (contextfreeT return) repVar
                -- EvNote: has the potential to cause issues if a bound var has
@@ -131,7 +137,8 @@ replaceType tymap = repTerm
   where repTerm :: TransHOL thry HOLTerm HOLTerm
         repTerm =
                hvarT (contextfreeT return) repType (\ x -> return . mkVar x)
-            <+ contextfreeT (\ tm@Const{} -> return tm)
+            <+ hconstT (contextfreeT return) (contextfreeT return)
+                       (\ x ty -> mkMConst x ty)
             <+ hcombT repTerm repTerm (\ x -> liftO . mkComb x)
             <+ habsT repTerm repTerm (\ x -> liftO . mkAbs x)
             <+ htycombT repTerm repType (\ x -> liftO . mkTyComb x)
@@ -139,7 +146,9 @@ replaceType tymap = repTerm
 
         repType :: TransHOL thry HOLType HOLType
         repType =
-               contextfreeT (\ ty@TyVar{} -> return ty)
+               htyvarT (contextfreeT return) (contextfreeT return)
+                       (\ f x -> let ty = mkVarType x in
+                                   if f then liftO $ mkSmall ty else return ty)
             <+ htyappT (contextfreeT return) repType repTyApp
             <+ hutypeT (contextfreeT return) repType 
                  (\ x -> liftO . mkUType x)

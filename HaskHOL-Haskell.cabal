@@ -24,7 +24,7 @@ library
                    , haskhol-core >=1.2
                    , haskhol-deductive >=0.2
                    , haskhol-math >=0.1
-                   , hermit >= 0.6
+                   , hermit >= 1.0 && < 1.1
                    , ghc >= 7.8
                    , containers >= 0.5
                    , mtl >= 2.1
