@@ -70,9 +70,9 @@ thmMonadIdentity = cacheProof "thmMonadIdentity" ctxtHaskell .
       ]
 
 thmMonadMaybe :: HaskellCtxt thry => HOL cls thry HOLThm
-thmMonadMaybe = cacheProof "thmMonadMaybe" ctxtHaskell $
+thmMonadMaybe = --cacheProof "thmMonadMaybe" ctxtHaskell $
     prove [str| Monad 
-                  (\\'a 'b. (\ ds k .
+                  (\\ 'a 'b. (\ ds k .
                      match ds with Nothing -> Nothing | JustIn x -> k x)) 
                   Just |] tacMonadMaybe
 

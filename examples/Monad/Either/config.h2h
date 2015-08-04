@@ -1,0 +1,6 @@
+binding: $fMonadEither
+bindingType: ConsClass
+class: Monad2
+proofType: Tactic
+proofModule: HaskHOL.Lib.Haskell
+proofName: tacMonadEither

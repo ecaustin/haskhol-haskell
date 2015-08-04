@@ -1,0 +1,5 @@
+# Prelude Term Mappings
+("Just", "JustIn")
+("myeq", "=")
+("myrev", "REVERSE")
+("myapp", "APPEND")
